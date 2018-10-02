@@ -10,11 +10,13 @@ public extension HKHealthStore {
         }
     }
 
+#if os(iOS)
     func enableBackgroundDelivery(for type: HKObjectType, frequency: HKUpdateFrequency) -> Promise<Bool> {
         return Promise { seal in
             enableBackgroundDelivery(for: type, frequency: frequency, withCompletion: seal.resolve)
         }
     }
+#endif
 }
 
 public extension HKStatisticsQuery {

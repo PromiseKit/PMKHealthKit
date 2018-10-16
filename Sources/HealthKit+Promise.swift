@@ -31,9 +31,15 @@ public extension HKStatisticsQuery {
 }
 
 public extension HKAnchoredObjectQuery {
+    /// - Note: cancelling this promise will cancel the underlying task
+    /// - SeeAlso: [Cancellation](http://promisekit.org/docs/)
     static func promise(type: HKSampleType, predicate: NSPredicate? = nil, anchor: HKQueryAnchor? = nil, limit: Int = HKObjectQueryNoLimit, healthStore: HKHealthStore = .init()) -> Promise<([HKSample], [HKDeletedObject], HKQueryAnchor)> {
-        return Promise { seal in
-            let query = HKAnchoredObjectQuery(type: type, predicate: predicate, anchor: anchor, limit: limit) {
+        var query: HKAnchoredObjectQuery!
+        var reject: ((Error) -> Void)!
+
+        let promise = Promise<([HKSample], [HKDeletedObject], HKQueryAnchor)> { seal in
+            reject = seal.reject
+            query = HKAnchoredObjectQuery(type: type, predicate: predicate, anchor: anchor, limit: limit) {
                 if let a = $1, let b = $2, let c = $3 {
                     seal.fulfill((a, b, c))
                 } else if let e = $4 {
@@ -44,13 +50,18 @@ public extension HKAnchoredObjectQuery {
             }
             healthStore.execute(query)
         }
+        
+        promise.setCancellableTask(LongRunningQuery(healthStore: healthStore, query: query), reject: reject)
+        return promise
     }
 
 }
 
 public extension HKStatisticsCollectionQuery {
+    /// - Note: cancelling this promise will cancel the underlying task
+    /// - SeeAlso: [Cancellation](http://promisekit.org/docs/)
     func promise(healthStore: HKHealthStore = .init()) -> Promise<HKStatisticsCollection> {
-        return Promise { seal in
+        return Promise(cancellableTask: LongRunningQuery(healthStore: healthStore, query: self)) { seal in
             initialResultsHandler = {
                 seal.resolve($1, $2)
             }
@@ -68,4 +79,21 @@ public extension HKSampleQuery {
             healthStore.execute(query)
         }
     }
+}
+
+class LongRunningQuery: CancellableTask {
+    let healthStore: HKHealthStore
+    let query: HKQuery
+    
+    init(healthStore: HKHealthStore, query: HKQuery) {
+        self.healthStore = healthStore
+        self.query = query
+    }
+    
+    func cancel() {
+        healthStore.stop(query)
+        isCancelled = true
+    }
+    
+    var isCancelled = false
 }

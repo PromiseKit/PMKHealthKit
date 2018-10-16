@@ -31,6 +31,8 @@ public extension HKStatisticsQuery {
 }
 
 public extension HKAnchoredObjectQuery {
+    /// - Note: cancelling this promise will cancel the underlying task
+    /// - SeeAlso: [Cancellation](http://promisekit.org/docs/)
     static func promise(type: HKSampleType, predicate: NSPredicate? = nil, anchor: HKQueryAnchor? = nil, limit: Int = HKObjectQueryNoLimit, healthStore: HKHealthStore = .init()) -> Promise<([HKSample], [HKDeletedObject], HKQueryAnchor)> {
         var query: HKAnchoredObjectQuery!
         var reject: ((Error) -> Void)!
@@ -56,6 +58,8 @@ public extension HKAnchoredObjectQuery {
 }
 
 public extension HKStatisticsCollectionQuery {
+    /// - Note: cancelling this promise will cancel the underlying task
+    /// - SeeAlso: [Cancellation](http://promisekit.org/docs/)
     func promise(healthStore: HKHealthStore = .init()) -> Promise<HKStatisticsCollection> {
         return Promise(cancellableTask: LongRunningQuery(healthStore: healthStore, query: self)) { seal in
             initialResultsHandler = {
@@ -92,18 +96,4 @@ class LongRunningQuery: CancellableTask {
     }
     
     var isCancelled = false
-}
-
-//////////////////////////////////////////////////////////// Cancellable wrappers
-
-public extension HKAnchoredObjectQuery {
-    static func cancellablePromise(type: HKSampleType, predicate: NSPredicate? = nil, anchor: HKQueryAnchor? = nil, limit: Int = HKObjectQueryNoLimit, healthStore: HKHealthStore = .init()) -> CancellablePromise<([HKSample], [HKDeletedObject], HKQueryAnchor)> {
-        return cancellable(promise(type: type, predicate: predicate, anchor: anchor, limit: limit, healthStore: healthStore))
-    }
-}
-
-public extension HKStatisticsCollectionQuery {
-    func cancellablePromise(healthStore: HKHealthStore = .init()) -> CancellablePromise<HKStatisticsCollection> {
-        return cancellable(promise(healthStore: healthStore))
-    }
 }
